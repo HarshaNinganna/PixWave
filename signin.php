@@ -19,26 +19,38 @@ if ($conn->connect_error) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['sign_in'])) {
     $username = $_POST['username'];
     $email = $_POST['email'];
+    $mobile = $_POST['mobile'];
     $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+    
+    // Validate OTP (backend logic for OTP validation should be implemented separately)
+    $mobile_otp = $_POST['mobile_otp'];
+    $email_otp = $_POST['email_otp'];
 
-    // Hash the password
-    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    // Here you should validate the OTPs (not implemented in this snippet)
 
-    // Prepare statement to prevent SQL injection
-    $stmt = $conn->prepare("INSERT INTO Users (username, email, password) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $username, $email, $hashed_password);
-
-    if ($stmt->execute()) {
-        // User successfully created
-        $_SESSION['user_id'] = $stmt->insert_id;
-        $_SESSION['username'] = $username;
-        header("Location: index.php"); // Redirect to the main page
-        exit();
+    if ($password !== $confirm_password) {
+        $error_message = "Passwords do not match!";
     } else {
-        $error_message = "Error creating account: " . $stmt->error;
-    }
+        // Hash the password
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-    $stmt->close();
+        // Prepare statement to prevent SQL injection
+        $stmt = $conn->prepare("INSERT INTO Users (username, email, mobile, password) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("ssss", $username, $email, $mobile, $hashed_password);
+
+        if ($stmt->execute()) {
+            // User successfully created
+            $_SESSION['user_id'] = $stmt->insert_id;
+            $_SESSION['username'] = $username;
+            header("Location: index.php"); // Redirect to the main page
+            exit();
+        } else {
+            $error_message = "Error creating account: " . $stmt->error;
+        }
+
+        $stmt->close();
+    }
 }
 
 $conn->close();
@@ -55,15 +67,14 @@ $conn->close();
     <style>
         body {
             background-color: #fafafa;
-            font-family: 'Bahnschrift SemiCondensed', sans-serif; /* Set the font */
+            font-family: 'Bahnschrift SemiCondensed', sans-serif;
         }
         .sign-in-container {
-            max-width: 400px; /* Adjusted container width */
+            max-width: 400px;
             margin: 100px auto;
             padding: 20px;
             background-color: white;
             border: 2px solid #dbdbdb;
-            border-radius: 0px;
             box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
         }
         .sign-in-container h2 {
@@ -74,26 +85,6 @@ $conn->close();
             color: red;
             text-align: center;
         }
-        .logo {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .logo img {
-            width: 175px; /* Adjust logo size as needed */
-        }
-        .social-login {
-            display: flex;
-            justify-content: center; /* Center the images in the container */
-            align-items: center; /* Align items vertically */
-            flex-wrap: wrap; /* Allow wrapping if the container is too small */
-        }
-        .social-login img {
-            max-height: 70px; /* Set the maximum height for both images */
-            width: auto; /* Maintain the aspect ratio */
-            margin: 0 5px; /* Adjust the margin for spacing */
-            cursor: pointer;
-            object-fit: contain; /* Ensure images fit within their container */
-        }
         .form-group {
             position: relative;
             margin-bottom: 20px;
@@ -101,18 +92,10 @@ $conn->close();
         .form-control {
             border: 1px solid #ccc;
             border-radius: 5px;
-            transition: border-color 0.3s;
-            font-size: 14px; /* Reduced font size */
-            padding: 10px; /* Adjusted padding */
+            padding: 10px;
         }
         .form-control:focus {
             border-color: #007bff;
-        }
-        .form-control::placeholder {
-            color: transparent; /* Hide placeholder text */
-        }
-        .form-control:hover {
-            opacity: 0.8; /* Slightly increase opacity on hover */
         }
         .floating-label {
             position: absolute;
@@ -128,6 +111,31 @@ $conn->close();
             left: 15px;
             font-size: 12px;
             opacity: 1;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo img {
+            width: 175px; /* Adjust logo size as needed */
+        }
+        .social-login {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .social-login img {
+            max-height: 70px; /* Set the maximum height for both images */
+            width: auto;
+            height: auto;
+            margin: 0 0px;
+            cursor: pointer;
+            object-fit: contain;
+        }
+        .download-links img {
+            width: 240px; /* Adjust size as needed */
+            margin: 0 10px;
         }
         footer {
             text-align: center;
@@ -152,12 +160,30 @@ $conn->close();
                     <label class="floating-label" for="username">Username</label>
                 </div>
                 <div class="form-group">
+                    <input type="text" class="form-control" name="mobile" id="mobile" placeholder=" " required>
+                    <label class="floating-label" for="mobile">Mobile Number</label>
+                    <button type="button" class="btn btn-secondary mt-2" onclick="sendMobileOtp()">Send OTP</button>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-control" name="mobile_otp" id="mobile_otp" placeholder=" " required>
+                    <label class="floating-label" for="mobile_otp">Enter Mobile OTP</label>
+                </div>
+                <div class="form-group">
                     <input type="email" class="form-control" name="email" id="email" placeholder=" " required>
                     <label class="floating-label" for="email">Email</label>
+                    <button type="button" class="btn btn-secondary mt-2" onclick="sendEmailOtp()">Send OTP</button>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-control" name="email_otp" id="email_otp" placeholder=" " required>
+                    <label class="floating-label" for="email_otp">Enter Email OTP</label>
                 </div>
                 <div class="form-group">
                     <input type="password" class="form-control" name="password" id="password" placeholder=" " required>
                     <label class="floating-label" for="password">Password</label>
+                </div>
+                <div class="form-group">
+                    <input type="password" class="form-control" name="confirm_password" id="confirm_password" placeholder=" " required>
+                    <label class="floating-label" for="confirm_password">Confirm Password</label>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block" name="sign_in">Sign In</button>
             </form>
@@ -192,5 +218,30 @@ $conn->close();
 
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function sendMobileOtp() {
+            var mobile = document.getElementById("mobile").value;
+            $.ajax({
+                url: 'send_mobile_otp.php',
+                type: 'POST',
+                data: { mobile: mobile },
+                success: function(response) {
+                    alert(response);
+                }
+            });
+        }
+
+        function sendEmailOtp() {
+            var email = document.getElementById("email").value;
+            $.ajax({
+                url: 'send_email_otp.php',
+                type: 'POST',
+                data: { email: email },
+                success: function(response) {
+                    alert(response);
+                }
+            });
+        }
+    </script>
 </body>
 </html>
